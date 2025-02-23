@@ -8,15 +8,55 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { supabase } from "@/lib/supabase"
+
+type Country = "South Africa" | "United Kingdom"
+type EducationSystem = "matric" | "a-levels" | ""
+
+const educationSystems: Record<Country, string[]> = {
+  "South Africa": ["Matric", "A levels"],
+  "United Kingdom": ["A levels"],
+} as const
 
 export function CountryPage() {
   const navigate = useNavigate()
-  const [country, setCountry] = useState("")
-  const [educationSystem, setEducationSystem] = useState("")
+  const [country, setCountry] = useState<Country | "">("")
+  const [educationSystem, setEducationSystem] = useState<EducationSystem>("")
+  const [isLoading, setIsLoading] = useState(false)
 
-  const educationSystems = {
-    "South Africa": ["Matric", "A levels"],
-    "United Kingdom": ["A levels"],
+  const handleContinue = async () => {
+    try {
+      setIsLoading(true)
+      
+      const { data, error } = await supabase
+        .from('main')
+        .insert([
+          { 
+            selected_system: educationSystem,
+            gpa: null,
+            subject_id_1: null,
+            subject_id_2: null,
+            subject_id_3: null,
+            subject_id_4: null
+          }
+        ])
+        .select()
+        .single()
+
+      if (error) throw error
+
+      navigate('/documents', { 
+        state: { 
+          recordId: data.id,
+          country, 
+          educationSystem 
+        } 
+      })
+    } catch (error) {
+      console.error('Error creating record:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -24,7 +64,7 @@ export function CountryPage() {
       <div className="max-w-xl mx-auto space-y-8">
         <div className="space-y-4">
           <h2 className="text-2xl font-bold">Select Your Country</h2>
-          <Select onValueChange={setCountry}>
+          <Select onValueChange={(value) => setCountry(value as Country)}>
             <SelectTrigger>
               <SelectValue placeholder="Select a country" />
             </SelectTrigger>
@@ -38,13 +78,16 @@ export function CountryPage() {
         {country && (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold">Select Education System</h2>
-            <Select onValueChange={setEducationSystem}>
+            <Select onValueChange={(value) => setEducationSystem(value as EducationSystem)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select education system" />
               </SelectTrigger>
               <SelectContent>
                 {educationSystems[country].map((system) => (
-                  <SelectItem key={system} value={system}>
+                  <SelectItem 
+                    key={system} 
+                    value={system.toLowerCase().replace(" ", "-")}
+                  >
                     {system}
                   </SelectItem>
                 ))}
@@ -56,12 +99,10 @@ export function CountryPage() {
         <Button 
           className="w-full"
           size="lg"
-          disabled={!country || !educationSystem}
-          onClick={() => navigate('/documents', { 
-            state: { country, educationSystem } 
-          })}
+          disabled={!country || !educationSystem || isLoading}
+          onClick={handleContinue}
         >
-          Continue
+          {isLoading ? "Creating..." : "Continue"}
         </Button>
       </div>
     </div>
